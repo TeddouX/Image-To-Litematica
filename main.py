@@ -1,6 +1,6 @@
-import os, ast, cv2, warnings, litemapy, pygame, numpy as np
+import os, ast, cv2, warnings, litemapy, pygame, sys, time, numpy as np
 
-from customtkinter import CTkLabel, CTkProgressBar, CTkButton, CTkEntry, CTkCheckBox, CTkFont, CTk
+from customtkinter import CTkLabel, CTkButton, CTkEntry, CTkCheckBox, CTkFont, CTk
 from tkinter import StringVar
 from tkinter.filedialog import askopenfilename, askdirectory
 from sklearn.cluster import KMeans
@@ -24,8 +24,8 @@ class Window(CTk):
         self.use_dominant = False
 
         self.title("Image to Litematica")
-        self.geometry("500x600")
-        self.minsize(500, 600)
+        self.geometry("400x500")
+        self.minsize(400, 500)
 
         self.grid_rowconfigure((0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10), weight=1)
         self.grid_columnconfigure((0), weight=1)
@@ -120,11 +120,6 @@ class Window(CTk):
      
         run(self.image_file_path, self.output_folder_path, self.minecraft_version, self.to_litematica, self.to_minecraft_blocks, self.scale_factor, self.use_dominant)
 
-        # Delete the temp assets folder
-        os.system(f"rmdir {TEMP_FOLDER}\\assets /S /Q")
-        
-        exit(0)
-
 
     def ask_choose_image_file(self):
         file_path = askopenfilename(filetypes=[('PNG Files', '*.png')])
@@ -159,6 +154,17 @@ argument_parser.add_argument("--to-png", action="store_true", required=False, he
 argument_parser.add_argument("--dominant-color", default=False, action="store_true", required=False, help="Use the average color of the block else it will use the average color")
 argument_parser.add_argument("--out-folder", required=False, help="The output folder")
 argument_parser.add_argument("--verbose", default=False, action="store_true", required=False, help="Activate verbose")
+
+
+def print_progressbar(iteration: int, total: int, prefix = "Progress", suffix = "Complete", decimals = 2, fill = "█"):
+    percent = f"{round(100 * (iteration / float(total)), decimals)}"
+    filledLength = int(100 * iteration / total)
+    bar = (fill * filledLength) + ("-" * (100 - filledLength))
+
+    print(f'{prefix} |{bar}| {percent}% {suffix}', end = "\r")
+
+    if iteration == total: 
+        print("\r")
 
 
 def is_float(s):
@@ -224,12 +230,14 @@ def get_all_textures(version: str) -> list[dict[list[int], str]]:
 
     else:
 
+        model_files_num = len(os.listdir(models_folder))
+
         os.makedirs(os.path.join(TEMP_FOLDER, f"{version}"))
         open(full_blocks_cache_file, "x")
 
         if VERBOSE: print("Getting all full blocks models...")
         # Iterate throight all the files under models_folder
-        for file in os.listdir(models_folder):
+        for i, file in enumerate(os.listdir(models_folder)):
             file_name = os.path.splitext(os.path.basename(file))[0]
 
             with open(os.path.join(models_folder, file), "r") as h:
@@ -237,8 +245,9 @@ def get_all_textures(version: str) -> list[dict[list[int], str]]:
 
                 # Check if the block is a full block
                 if "cube_all" in contents and not any(blacklisted_block in file_name for blacklisted_block in blacklisted_blocks):
-                    print(file_name)
                     full_blocks.append(file_name)
+
+            print_progressbar(i + 1, model_files_num)
 
         with open(full_blocks_cache_file, 'w') as h:
             h.write(str(full_blocks))
@@ -281,6 +290,7 @@ def get_all_textures(version: str) -> list[dict[list[int], str]]:
 def generate_blocks_array(original_path: str, averages_and_dominants: list[dict[list[int], str]], scale_factor: int) -> list[list[str]]:
     global out_image_width
     global out_image_height
+    global num_blocks
     
     img = cv2.imread(original_path)
 
@@ -296,8 +306,11 @@ def generate_blocks_array(original_path: str, averages_and_dominants: list[dict[
     colors_values = [ast.literal_eval(i) for i in colors.keys()]
 
     blocks_names: list[list[str]] = np.empty((cols, rows), dtype=object)
+    blocks_shape = np.shape(blocks_names)
+    num_blocks = blocks_shape[0] * blocks_shape[1]
 
     if VERBOSE: print("Filling block arrays...")
+    i = 0
     for col in range(cols):
         for row in range(rows):
             pixel = img[col, row]
@@ -309,16 +322,33 @@ def generate_blocks_array(original_path: str, averages_and_dominants: list[dict[
 
             blocks_names[col, row] = block_name
 
+            i += 1
+            print_progressbar(i, num_blocks)
+
     return blocks_names
 
 
 def generate_image(blocks: list[list[str]]) -> None:
     # Pygame window
     pygame.init()
-    display = pygame.display.set_mode((out_image_height * 16, out_image_width * 16))
-    pygame.display.set_caption("Image To Minecraft Blocks")
+
+    try: 
+        window_res = (out_image_height * 16, out_image_width * 16)
+        screen_res_info = pygame.display.Info()
+
+        # If the window size is bigger than the screen's resolution, hide the window
+        if window_res[0] > screen_res_info.current_w or window_res[1] > screen_res_info.current_h:
+            display = pygame.display.set_mode(window_res, flags=pygame.HIDDEN)
+        else:
+            display = pygame.display.set_mode(window_res)
+            pygame.display.set_caption("Image To Minecraft Blocks")
+
+    except pygame.error: 
+        print("Image resolution is too high. Try increasing the scale factor.")
+        return
 
     if VERBOSE: print("Generating image...")
+    i = 0
     for col_idx, _ in enumerate(blocks):
         for row_idx, block_name in enumerate(blocks[col_idx]):
             block_texture_path = get_minecraft_block_texture(block_name)
@@ -329,9 +359,17 @@ def generate_image(blocks: list[list[str]]) -> None:
             display.blit(pygame_img, (row_idx * 16, col_idx * 16), (0, 0, 16, 16))
             # Render the screen
             pygame.display.flip()
+
+            i += 1
+            print_progressbar(i, num_blocks)
     
     # Save the screen
     pygame.image.save(display, os.path.join(out_folder, f"./{to_file_name}-Minecraft.png"))
+    if VERBOSE: print("Finished generating image...")
+    
+    time.sleep(3)
+
+    pygame.display.quit()
 
 
 def generate_litematica(blocks: list[list[str]]) -> None:
@@ -339,18 +377,24 @@ def generate_litematica(blocks: list[list[str]]) -> None:
     schem = reg.as_schematic(name=to_file_name, author="Picture To Litematica", description="Made with litemapy")
 
     if VERBOSE: print("Generating litematica...")
+    i = 0
     for col_idx, _ in enumerate(blocks):
         for row_idx, block_name in enumerate(blocks[col_idx]):
             # Create a block
             block = litemapy.BlockState(f"minecraft:{block_name}")
             # Add it to the liteamtic region
             reg[row_idx, -col_idx, 0] = block
+
+            i += 1
+            print_progressbar(i, num_blocks)
     
     if not os.path.exists(out_folder):
         os.makedirs(out_folder)
 
     # Save the schematic
     schem.save(os.path.join(out_folder, f"{to_file_name}.litematic"))
+
+    if VERBOSE: print("Finished generating litematica...")
 
 
 def run(image_file_path: str, output_folder: str, minecraft_version: str, to_litematica: bool, to_minecraft_blocks: bool, scale_factor: float, dominant: bool):
@@ -374,6 +418,9 @@ def run(image_file_path: str, output_folder: str, minecraft_version: str, to_lit
     if to_minecraft_blocks:
         generate_image(blocks)
 
+    # Delete the temp assets folder
+    os.system(f"rmdir {TEMP_FOLDER}\\assets /S /Q")
+
 
 def main() -> None:
     global VERBOSE
@@ -395,6 +442,8 @@ def main() -> None:
         if verbose: VERBOSE = True
 
         run(image_path, out_folder, minecraft_version, to_litematica, to_png, scale_factor, use_dominant)
+
+        sys.exit(0)
     
     else:
         VERBOSE = True
