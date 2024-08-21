@@ -1,5 +1,5 @@
 
-# Picture To Litematica
+# Image To Litematica
 A python script to convert a png file to either another picture made of minecraft blocks or to a Litematica file.
 
 
