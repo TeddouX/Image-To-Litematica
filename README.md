@@ -1,14 +1,13 @@
-
 # Image To Litematica
-A python script to convert a png file to either another picture made of minecraft blocks or to a Litematica file.
+A python script to convert a png file to either another image made of minecraft blocks or to a Litematica file.
 
 ## Download
-- Download the zip file
+- Download the zip file from the latest release (https://github.com/TeddouX/ImageToLitematica/releases/latest)
 - Extract zip file contents
-- Run the exe inside (no need for more installation)
+- Run the exe inside (no need for more installation) and ignore the windows defender prompt
 
 ### Why a zip file
-The python script was built using the pyinstaller library with the --onedir option wich makes the Portable Executable file way faster at launch. This command produces a folder which I compressed into a zip file for faster download speeds.
+The python script was built using the pyinstaller library with the --onedir option wich makes the executable file way faster at launch. This command produces a folder which I compressed into a zip file for faster download speeds.
 
 ## Example
 ### Input: 
@@ -17,9 +16,8 @@ The python script was built using the pyinstaller library with the --onedir opti
 ### Output:
 ![alt text](https://github.com/TeddouX/Picture-To-Litematica/blob/main/example/Screenshot%202024-07-03%20112003-Minecraft.png?raw=true)
 
-
 ## Documentation
-
+### /!\ This is useful only if the executable is ran in a command prompt !
 Arguments: <br>
   - -h, --help show this help message and exit
   - --version The minecraft version that you want to use
