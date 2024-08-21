@@ -1,5 +1,6 @@
 # Image To Litematica
 A python script to convert a png file to either another image made of minecraft blocks or to a Litematica file.
+### /!\ Minecraft needs to be installed on your computer !
 
 ## Download
 - Download the zip file from the latest release (https://github.com/TeddouX/ImageToLitematica/releases/latest)
