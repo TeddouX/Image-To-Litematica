@@ -1,9 +1,144 @@
-import os, ast, cv2, warnings, pygame, litemapy, numpy as np
+import os, ast, cv2, warnings, litemapy, pygame, numpy as np
 
+from customtkinter import CTkLabel, CTkProgressBar, CTkButton, CTkEntry, CTkCheckBox, CTkFont, CTk
+from tkinter import StringVar
+from tkinter.filedialog import askopenfilename, askdirectory
 from sklearn.cluster import KMeans
+from typing import Tuple
 from argparse import ArgumentParser
 from zipfile import ZipFile
 from sys import argv
+
+
+# Ctk Window
+class Window(CTk):
+    def __init__(self, fg_color: str | Tuple[str, str] | None = None, **kwargs):
+        super().__init__(fg_color, **kwargs)
+
+        self.image_file_path = ""
+        self.output_folder_path = ""
+        self.minecraft_version = ""
+        self.to_minecraft_blocks = ""
+        self.to_litematica = ""
+        self.scale_factor = 1
+        self.use_dominant = False
+
+        self.title("Image to Litematica")
+        self.geometry("500x600")
+        self.minsize(500, 600)
+
+        self.grid_rowconfigure((0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10), weight=1)
+        self.grid_columnconfigure((0), weight=1)
+
+        self.image_file_path_strvar = StringVar(master=self, value="Image: None selected.")
+        self.out_folder_path_strvar = StringVar(master=self, value="Output folder: None selected.")
+        self.to_litematica_check_var = StringVar(master=self, value="on")
+        self.to_minecraft_blocks_check_var = StringVar(master=self, value="off")
+        self.use_dominant_checkbox_var = StringVar(master=self, value="off")
+
+        self.title_text = CTkLabel(master=self, text="Picture to Minecraft", font=CTkFont(size=26, weight="bold"))
+        self.title_text.grid(column=0, row=0)
+        self.title_text.grid_rowconfigure(5, weight=1)
+        self.title_text.grid_columnconfigure(5, weight=1)
+
+        self.image_file_path_text = CTkLabel(master=self, textvariable=self.image_file_path_strvar)
+        self.image_file_path_text.grid(column=0, row=1)
+        self.image_file_path_text.grid_rowconfigure(5, weight=1)
+        self.image_file_path_text.grid_columnconfigure(5, weight=1)
+
+        self.choose_image_btn = CTkButton(master=self, text='Select Image', command=self.ask_choose_image_file)
+        self.choose_image_btn.grid(column=0, row=2)
+        self.choose_image_btn.grid_rowconfigure(5, weight=1)
+        self.choose_image_btn.grid_columnconfigure(5, weight=1)
+
+        self.out_folder_path_text = CTkLabel(master=self, textvariable=self.out_folder_path_strvar)
+        self.out_folder_path_text.grid(column=0, row=3)
+        self.out_folder_path_text.grid_rowconfigure(5, weight=1)
+        self.out_folder_path_text.grid_columnconfigure(5, weight=1)
+
+        self.choose_out_folder = CTkButton(master=self, text='Select Output Folder', command=self.ask_choose_output_folder)
+        self.choose_out_folder.grid(column=0, row=4)
+        self.choose_out_folder.grid_rowconfigure(5, weight=1)
+        self.choose_out_folder.grid_columnconfigure(5, weight=1)
+
+        self.minecraft_version_entry = CTkEntry(master=self, placeholder_text="Minecraft Version...")
+        self.minecraft_version_entry.grid(column=0, row=5)
+        self.minecraft_version_entry.grid_rowconfigure(5, weight=1)
+        self.minecraft_version_entry.grid_columnconfigure(5, weight=1)
+
+        self.to_litematica_checkbox = CTkCheckBox(master=self, text="To Litematica", variable=self.to_litematica_check_var, onvalue="on", offvalue="off")
+        self.to_litematica_checkbox.grid(column=0, row=6)
+        self.to_litematica_checkbox.grid_rowconfigure(5, weight=1)
+        self.to_litematica_checkbox.grid_columnconfigure(5, weight=1)
+
+        self.to_minecraft_blocks_checkbox = CTkCheckBox(master=self, text="To Minecraft Blocks", variable=self.to_minecraft_blocks_check_var, onvalue="on", offvalue="off")
+        self.to_minecraft_blocks_checkbox.grid(column=0, row=7)
+        self.to_minecraft_blocks_checkbox.grid_rowconfigure(5, weight=1)
+        self.to_minecraft_blocks_checkbox.grid_columnconfigure(5, weight=1)
+
+        self.scale_factor_entry = CTkEntry(master=self, placeholder_text="Scale Factor...")
+        self.scale_factor_entry.grid(column=0, row=8)
+        self.scale_factor_entry.grid_rowconfigure(5, weight=1)
+        self.scale_factor_entry.grid_columnconfigure(5, weight=1)
+
+        self.use_dominant_checkbox = CTkCheckBox(master=self, text="Use Dominant", variable=self.use_dominant_checkbox_var, onvalue="on", offvalue="off")
+        self.use_dominant_checkbox.grid(column=0, row=9)
+        self.use_dominant_checkbox.grid_rowconfigure(5, weight=1)
+        self.use_dominant_checkbox.grid_columnconfigure(5, weight=1)
+
+        self.convert_button = CTkButton(master=self, text='Generate', command=self.generate)
+        self.convert_button.grid(column=0, row=10)
+        self.convert_button.grid_rowconfigure(5, weight=1)
+        self.convert_button.grid_columnconfigure(5, weight=1)
+
+
+    def generate(self):
+        global FINISHED
+
+        self.to_litematica = True if self.to_litematica_check_var.get() == "on" else False
+        self.to_minecraft_blocks = True if self.to_minecraft_blocks_check_var.get() == "on" else False
+        self.use_dominant = True if self.use_dominant_checkbox_var.get() == "on" else False
+        self.minecraft_version = self.minecraft_version_entry.get()
+        self.scale_factor = self.scale_factor_entry.get()
+
+        if self.scale_factor == "":
+            self.scale_factor == DEFAULT_SCALE_FACTOR
+
+        if not is_float(self.scale_factor):
+            print("Scale factor is invalid!")
+            return
+
+        self.scale_factor = float(self.scale_factor)
+        
+        if not self.to_litematica and not self.to_minecraft_blocks:
+            print("Both To Litematia and To Minecraft bloks cannot be off at the same time!")
+            return
+        
+        if self.minecraft_version == "":
+            print("Minecraft version is invalid")
+            return
+     
+        run(self.image_file_path, self.output_folder_path, self.minecraft_version, self.to_litematica, self.to_minecraft_blocks, self.scale_factor, self.use_dominant)
+
+        # Delete the temp assets folder
+        os.system(f"rmdir {TEMP_FOLDER}\\assets /S /Q")
+        
+        exit(0)
+
+
+    def ask_choose_image_file(self):
+        file_path = askopenfilename(filetypes=[('PNG Files', '*.png')])
+
+        self.image_file_path = file_path
+        self.image_file_path_strvar.set("Image: " + os.path.basename(file_path))
+
+
+    def ask_choose_output_folder(self):
+        folder_path = askdirectory()
+
+        self.output_folder_path = folder_path
+        self.out_folder_path_strvar.set("Output Folder: " + os.path.basename(folder_path))
+
 
 
 # Const variables
@@ -11,6 +146,7 @@ APPDATA_ROAMING = os.getenv("appdata")
 TEMP_FOLDER = os.path.join(os.getenv("tmp"), "PictureToMinecraft")
 MINECRAFT_VERSION_FOLDER = os.path.join(APPDATA_ROAMING, ".minecraft/versions")
 VERBOSE = False
+DEFAULT_SCALE_FACTOR = 2.0
 
 
 # Argument parser
@@ -20,11 +156,19 @@ argument_parser.add_argument("--image", required=True, help="The file that you w
 argument_parser.add_argument("--scale-factor", type=float, required=False, default=2, help="The scale factor for the output")
 argument_parser.add_argument("--to-litematica", action="store_true", required=False, help="If you want the image to be converted to a litematica file")
 argument_parser.add_argument("--to-png", action="store_true", required=False, help="If you want the image to be converted to a png file")
-argument_parser.add_argument("--name", default="", required=False, help="The name that the image should have. Defaults to the input image's name")
 argument_parser.add_argument("--dominant-color", default=False, action="store_true", required=False, help="Use the average color of the block else it will use the average color")
 argument_parser.add_argument("--out-folder", required=False, help="The output folder")
 argument_parser.add_argument("--verbose", default=False, action="store_true", required=False, help="Activate verbose")
 
+
+def is_float(s):
+    try: 
+        float(s)
+    except ValueError:
+        return False
+    else:
+        return True
+    
 
 def get_closest_color(colors, color: list[int]):
     color = np.array(color)
@@ -209,46 +353,54 @@ def generate_litematica(blocks: list[list[str]]) -> None:
     schem.save(os.path.join(out_folder, f"{to_file_name}.litematic"))
 
 
-def main() -> None:
-    global VERBOSE
+def run(image_file_path: str, output_folder: str, minecraft_version: str, to_litematica: bool, to_minecraft_blocks: bool, scale_factor: float, dominant: bool):
     global use_dominant
-    global to_file_name
     global out_folder
+    global to_file_name
 
-    arguments = argv
+    use_dominant = dominant
+    out_folder = output_folder
+    to_file_name = os.path.splitext(os.path.basename(image_file_path))[0]
 
-    # Get all parsed arguments
-    parsed_arguments = argument_parser.parse_args(arguments[1:])
-    minecraft_version = parsed_arguments.version
-    image_path = parsed_arguments.image
-    scale_factor = parsed_arguments.scale_factor
-    to_litematica = parsed_arguments.to_litematica
-    to_png = parsed_arguments.to_png
-    to_file_name = parsed_arguments.name
-    use_dominant = parsed_arguments.dominant_color
-    out_folder = parsed_arguments.out_folder
-    verbose = parsed_arguments.verbose
-
-    if verbose: VERBOSE = True
-
-    if not os.path.exists(image_path):
-        raise RuntimeError(f"The image path ({image_path}) is incorrect.")
-
-    # to_file_name defaults to the input file name    
-    if to_file_name == "":
-        to_file_name = os.path.splitext(os.path.basename(image_path))[0]
+    if not os.path.exists(image_file_path):
+        raise RuntimeError(f"The image path ({image_file_path}) is incorrect.")
 
     averages_and_dominants = get_all_textures(minecraft_version)
-    blocks = generate_blocks_array(image_path, averages_and_dominants, scale_factor)
+    blocks = generate_blocks_array(image_file_path, averages_and_dominants, scale_factor)
 
     if to_litematica:
         generate_litematica(blocks)
     
-    if to_png:
+    if to_minecraft_blocks:
         generate_image(blocks)
 
-    # Delete the temp assets folder
-    os.system(f"rmdir {TEMP_FOLDER}\\assets /S /Q")
+
+def main() -> None:
+    global VERBOSE
+
+    arguments = argv
+
+    if len(arguments) > 1:
+        # Get all parsed arguments
+        parsed_arguments = argument_parser.parse_args(arguments[1:])
+        minecraft_version = parsed_arguments.version
+        image_path = parsed_arguments.image
+        scale_factor = parsed_arguments.scale_factor
+        to_litematica = parsed_arguments.to_litematica
+        to_png = parsed_arguments.to_png
+        use_dominant = parsed_arguments.dominant_color
+        out_folder = parsed_arguments.out_folder
+        verbose = parsed_arguments.verbose
+
+        if verbose: VERBOSE = True
+
+        run(image_path, out_folder, minecraft_version, to_litematica, to_png, scale_factor, use_dominant)
+    
+    else:
+        VERBOSE = True
+
+        window = Window()
+        window.mainloop()
 
 
 if __name__ == "__main__":
