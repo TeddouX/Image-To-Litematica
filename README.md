@@ -3,9 +3,9 @@ A python script to convert a png file to either another image made of minecraft 
 ### /!\ Minecraft needs to be downloaded on your computer !
 
 ## Download
-- Download the zip file from the latest release (https://github.com/TeddouX/ImageToLitematica/releases/latest)
-- Extract zip file contents
-- Run the exe inside (no need for more installation) and ignore the windows defender prompt
+- Download the zip file from the latest release (https://github.com/TeddouX/ImageToLitematica/releases/latest).
+- Extract zip file contents.
+- Run the exe inside (no need for more installation).
 
 ### Why a zip file
 The python script was built using the pyinstaller library with the --onedir option wich makes the executable way faster at launch. This command produces a folder which I compressed into a zip file for faster download speeds.
