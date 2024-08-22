@@ -8,7 +8,7 @@ A python script to convert a png file to either another image made of minecraft 
 - Run the exe inside (no need for more installation) and ignore the windows defender prompt
 
 ### Why a zip file
-The python script was built using the pyinstaller library with the --onedir option wich makes the executable file way faster at launch. This command produces a folder which I compressed into a zip file for faster download speeds.
+The python script was built using the pyinstaller library with the --onedir option wich makes the executable way faster at launch. This command produces a folder which I compressed into a zip file for faster download speeds.
 
 ## Example
 ### Input: 
