@@ -11,6 +11,7 @@ A python script to convert a png file to either another image made of minecraft 
 The python script was built using the pyinstaller library with the --onedir option wich makes the executable way faster at launch. This command produces a folder which I compressed into a zip file for faster download speeds.
 
 ## Example
+For one pixel = one blocks use a 0.0635 scale factor.
 ### Input: 
 ![alt text](https://github.com/TeddouX/Picture-To-Litematica/blob/main/example/Screenshot%202024-07-03%20112003.png?raw=true)
 
