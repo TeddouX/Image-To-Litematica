@@ -156,12 +156,12 @@ argument_parser.add_argument("--out-folder", required=False, help="The output fo
 argument_parser.add_argument("--verbose", default=False, action="store_true", required=False, help="Activate verbose")
 
 
-def print_progressbar(iteration: int, total: int, prefix = "Progress", suffix = "Complete", decimals = 2, fill = "█"):
+def print_progressbar(iteration: int, total: int, prefix="Progress", suffix="Complete", decimals=2, fill="█", end_line='\r'):
     percent = f"{round(100 * (iteration / float(total)), decimals)}"
     filledLength = int(100 * iteration / total)
     bar = (fill * filledLength) + ("-" * (100 - filledLength))
 
-    print(f'{prefix} |{bar}| {percent}% {suffix}', end = "\r")
+    print(f'{prefix} |{bar}| {percent}% {suffix}', end=end_line)
 
     if iteration == total: 
         print("\r")
@@ -287,11 +287,7 @@ def get_all_textures(version: str) -> list[dict[list[int], str]]:
     return [averages, dominants]
 
 
-def generate_blocks_array(original_path: str, averages_and_dominants: list[dict[list[int], str]], scale_factor: int) -> list[list[str]]:
-    global out_image_width
-    global out_image_height
-    global num_blocks
-    
+def generate(original_path: str, averages_and_dominants: list[dict[list[int], str]], scale_factor: int) -> None:
     img = cv2.imread(original_path)
 
     # 16: block texture resolution
@@ -309,8 +305,37 @@ def generate_blocks_array(original_path: str, averages_and_dominants: list[dict[
     blocks_shape = np.shape(blocks_names)
     num_blocks = blocks_shape[0] * blocks_shape[1]
 
-    if VERBOSE: print("Filling block arrays...")
+    if to_litematica: 
+        reg = litemapy.Region(0, 0, 0, out_image_height, -out_image_width, 1)
+        schem = reg.as_schematic(name=to_file_name, author="Picture To Litematica", description="Made with litemapy")
+
+        if VERBOSE: print("Generating litematica...")
+
+
+    if to_png: 
+        # Pygame window
+        pygame.init()
+
+        try: 
+            window_res = (out_image_height * 16, out_image_width * 16)
+            screen_res_info = pygame.display.Info()
+
+            # If the window size is bigger than the screen's resolution, hide the window
+            if window_res[0] > screen_res_info.current_w or window_res[1] > screen_res_info.current_h:
+                display = pygame.display.set_mode(window_res, flags=pygame.HIDDEN)
+            else:
+                display = pygame.display.set_mode(window_res)
+                pygame.display.set_caption("Image To Minecraft Blocks")
+
+        except pygame.error: 
+            print("Image resolution is too high. Try increasing the scale factor.")
+            return
+        
+
+        if VERBOSE: print("Generating image...")
+
     i = 0
+
     for col in range(cols):
         for row in range(rows):
             pixel = img[col, row]
@@ -320,103 +345,65 @@ def generate_blocks_array(original_path: str, averages_and_dominants: list[dict[
 
             block_name = list(colors.values())[colors_values.index(closest_color)]
 
-            blocks_names[col, row] = block_name
-
-            i += 1
-            print_progressbar(i, num_blocks)
-
-    return blocks_names
-
-
-def generate_image(blocks: list[list[str]]) -> None:
-    # Pygame window
-    pygame.init()
-
-    try: 
-        window_res = (out_image_height * 16, out_image_width * 16)
-        screen_res_info = pygame.display.Info()
-
-        # If the window size is bigger than the screen's resolution, hide the window
-        if window_res[0] > screen_res_info.current_w or window_res[1] > screen_res_info.current_h:
-            display = pygame.display.set_mode(window_res, flags=pygame.HIDDEN)
-        else:
-            display = pygame.display.set_mode(window_res)
-            pygame.display.set_caption("Image To Minecraft Blocks")
-
-    except pygame.error: 
-        print("Image resolution is too high. Try increasing the scale factor.")
-        return
-
-    if VERBOSE: print("Generating image...")
-    i = 0
-    for col_idx, _ in enumerate(blocks):
-        for row_idx, block_name in enumerate(blocks[col_idx]):
             block_texture_path = get_minecraft_block_texture(block_name)
 
-            # Create a pygame image
-            pygame_img = pygame.image.load(block_texture_path).convert()
-            # Add it to the screen
-            display.blit(pygame_img, (row_idx * 16, col_idx * 16), (0, 0, 16, 16))
-            # Render the screen
-            pygame.display.flip()
+            if to_png:
+                # Create a pygame image
+                pygame_img = pygame.image.load(block_texture_path).convert()
+                # Add it to the screen
+                display.blit(pygame_img, (row * 16, col * 16), (0, 0, 16, 16))
+                # Render the screen
+                pygame.display.flip()
+
+
+            if to_litematica:
+                # Create a block
+                block = litemapy.BlockState(f"minecraft:{block_name}")
+                # Add it to the liteamtic region
+                reg[row, -col, 0] = block
 
             i += 1
+
             print_progressbar(i, num_blocks)
-    
-    # Save the screen
-    pygame.image.save(display, os.path.join(out_folder, f"./{to_file_name}-Minecraft.png"))
-    if VERBOSE: print("Finished generating image...")
-    
-    time.sleep(3)
 
-    pygame.display.quit()
+    if to_png:
+        # Save the screen
+        pygame.image.save(display, os.path.join(output_folder, f"./{to_file_name}-Minecraft.png"))
+        if VERBOSE: print("Finished generating image...")
+        
+        time.sleep(3)
 
+        pygame.display.quit()
 
-def generate_litematica(blocks: list[list[str]]) -> None:
-    reg = litemapy.Region(0, 0, 0, out_image_height, -out_image_width, 1)
-    schem = reg.as_schematic(name=to_file_name, author="Picture To Litematica", description="Made with litemapy")
+    if to_litematica:
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
 
-    if VERBOSE: print("Generating litematica...")
-    i = 0
-    for col_idx, _ in enumerate(blocks):
-        for row_idx, block_name in enumerate(blocks[col_idx]):
-            # Create a block
-            block = litemapy.BlockState(f"minecraft:{block_name}")
-            # Add it to the liteamtic region
-            reg[row_idx, -col_idx, 0] = block
+        # Save the schematic
+        schem.save(os.path.join(output_folder, f"{to_file_name}.litematic"))
 
-            i += 1
-            print_progressbar(i, num_blocks)
-    
-    if not os.path.exists(out_folder):
-        os.makedirs(out_folder)
-
-    # Save the schematic
-    schem.save(os.path.join(out_folder, f"{to_file_name}.litematic"))
-
-    if VERBOSE: print("Finished generating litematica...")
+        if VERBOSE: print("Finished generating litematica...")
 
 
-def run(image_file_path: str, output_folder: str, minecraft_version: str, to_litematica: bool, to_minecraft_blocks: bool, scale_factor: float, dominant: bool):
-    global use_dominant
-    global out_folder
+def run(image_file_path: str, out_folder: str, minecraft_version: str, litematica: bool, png: bool, scale_factor: float, dominant: bool):
     global to_file_name
+    global use_dominant
+    global output_folder
+    global to_litematica
+    global to_png
 
     use_dominant = dominant
-    out_folder = output_folder
+    output_folder = out_folder
+    to_litematica = litematica
+    to_png = png
+
     to_file_name = os.path.splitext(os.path.basename(image_file_path))[0]
 
     if not os.path.exists(image_file_path):
         raise RuntimeError(f"The image path ({image_file_path}) is incorrect.")
 
     averages_and_dominants = get_all_textures(minecraft_version)
-    blocks = generate_blocks_array(image_file_path, averages_and_dominants, scale_factor)
-
-    if to_litematica:
-        generate_litematica(blocks)
-    
-    if to_minecraft_blocks:
-        generate_image(blocks)
+    generate(image_file_path, averages_and_dominants, scale_factor)
 
     # Delete the temp assets folder
     os.system(f"rmdir {TEMP_FOLDER}\\assets /S /Q")
@@ -424,7 +411,11 @@ def run(image_file_path: str, output_folder: str, minecraft_version: str, to_lit
 
 def main() -> None:
     global VERBOSE
-
+    global use_dominant
+    global out_folder
+    global to_litematica
+    global to_png
+    
     arguments = argv
 
     if len(arguments) > 1:
