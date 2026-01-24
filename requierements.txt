@@ -1,0 +1,6 @@
+customtkinter
+opencv-python
+litemapy
+pygame
+scikit-learn
+numpy
