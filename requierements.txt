@@ -1,6 +1,6 @@
 customtkinter
 opencv-python
 litemapy
-pygame
+pygame-ce
 scikit-learn
 numpy
