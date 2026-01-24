@@ -17,7 +17,7 @@ OR
 ### /!\ This is useful only if the executable/script is ran in a command prompt !
 Arguments: <br>
   - -h, --help show this help message and exit
-  - --version The minecraft version that you want to use
+  - --version The minecraft version that you want to use (look in %AppData%\.minecraft\versions)
   - --image The file that you want to be converted
   - --scale-factor The scale factor for the output
   - --to-litematica If you want the image to be converted to a litematica file
